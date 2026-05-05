@@ -45,7 +45,7 @@ See `docker-compose.yaml` for complete list of configurable options.
 
 ## 📂 Volumes
 
-- `./rootfs/data/windmill` - Data storage
+- `./volumes/data/windmill` - Data storage
 
 ## 🔍 Logging
 
