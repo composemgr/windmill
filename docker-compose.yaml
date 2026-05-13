@@ -17,6 +17,8 @@ services:
     logging: *default-logging
     environment:
       TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: windmill-app
+      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
       DATABASE_URL: postgres://${DB_USER_NAME:-windmill}:${DB_USER_PASS:-changeme_db_password}@windmill-db/windmill
       MODE: server
       BASE_URL: http://${BASE_HOST_NAME:-$HOSTNAME}:8000
@@ -29,6 +31,24 @@ services:
         condition: service_healthy
     networks:
       - windmill
+      - proxy
+      - cloudflare
+    labels:
+      - 'traefik.enable=true'
+      - 'cloudflare.enable=true'
+      - 'traefik.docker.network=proxy'
+      - 'cloudflare.service=http://windmill-app:8000'
+      - 'cloudflare.hostname=windmill.${CLOUDFLARE_ZONE_NAME:-}'
+      - 'traefik.http.routers.windmill-app.entrypoints=http'
+      - 'traefik.http.routers.windmill-app-secure.tls=true'
+      - 'traefik.http.routers.windmill-app.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
+      - 'traefik.http.middlewares.windmill-app-https-redirect.redirectscheme.scheme=https'
+      - 'traefik.http.routers.windmill-app.middlewares=windmill-app-https-redirect'
+      - 'traefik.http.routers.windmill-app-secure.entrypoints=https'
+      - 'traefik.http.routers.windmill-app-secure.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
+      - 'traefik.http.routers.windmill-app-secure.tls.certresolver=cloudflare'
+      - 'traefik.http.routers.windmill-app-secure.service=windmill-app'
+      - 'traefik.http.services.windmill-app.loadbalancer.server.port=8000'
 
   worker:
     image: ghcr.io/windmill-labs/windmill:main
@@ -38,6 +58,7 @@ services:
     logging: *default-logging
     environment:
       TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: windmill-worker
       DATABASE_URL: postgres://${DB_USER_NAME:-windmill}:${DB_USER_PASS:-changeme_db_password}@windmill-db/windmill
       MODE: worker
       WORKER_GROUP: default
@@ -55,6 +76,7 @@ services:
     logging: *default-logging
     environment:
       TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: windmill-db
       POSTGRES_DB: windmill
       POSTGRES_USER: ${DB_USER_NAME:-windmill}
       POSTGRES_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
@@ -72,3 +94,7 @@ networks:
   windmill:
     name: windmill
     external: false
+  proxy:
+    external: true
+  cloudflare:
+    external: true
