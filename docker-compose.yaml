@@ -17,10 +17,54 @@ services:
     logging: *default-logging
     environment:
       TZ: ${TZ:-America/New_York}
+      DATABASE_URL: postgres://${DB_USER_NAME:-windmill}:${DB_USER_PASS:-changeme_db_password}@windmill-db/windmill
+      MODE: server
+      BASE_URL: http://${BASE_HOST_NAME:-$HOSTNAME}:8000
     ports:
       - '172.17.0.1:8000:8000'
     volumes:
-      - './volumes/data/windmill:/data'
+      - './volumes/data/windmill:/tmp/windmill'
+    depends_on:
+      windmill-db:
+        condition: service_healthy
+    networks:
+      - windmill
+
+  worker:
+    image: ghcr.io/windmill-labs/windmill:main
+    container_name: windmill-worker
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      DATABASE_URL: postgres://${DB_USER_NAME:-windmill}:${DB_USER_PASS:-changeme_db_password}@windmill-db/windmill
+      MODE: worker
+      WORKER_GROUP: default
+    depends_on:
+      windmill-db:
+        condition: service_healthy
+    networks:
+      - windmill
+
+  windmill-db:
+    image: postgres:latest
+    container_name: windmill-db
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      POSTGRES_DB: windmill
+      POSTGRES_USER: ${DB_USER_NAME:-windmill}
+      POSTGRES_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
+    volumes:
+      - './volumes/data/db/postgres/windmill:/var/lib/postgresql/data'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
       - windmill
 
